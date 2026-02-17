@@ -10,6 +10,9 @@ namespace PolyLauncher.Models
         [JsonProperty("autoStartExecutor")]
         public bool AutoStartExecutor { get; set; } = false;
 
+        [JsonProperty("forceRedownloadMods")]
+        public bool ForceRedownloadMods { get; set; } = false;
+
         [JsonProperty("allowMulticlient")]
         public bool AllowMulticlient { get; set; } = true;
 

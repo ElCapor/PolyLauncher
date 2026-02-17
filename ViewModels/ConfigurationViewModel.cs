@@ -18,6 +18,9 @@ namespace PolyLauncher.ViewModels
         private bool autoStartExecutor;
 
         [ObservableProperty]
+        private bool forceRedownloadMods;
+
+        [ObservableProperty]
         private bool allowMulticlient;
 
         [ObservableProperty]
@@ -65,6 +68,7 @@ namespace PolyLauncher.ViewModels
             var settings = _settingsService.LoadSettings();
             EnableHwidSpoofer = settings.EnableHwidSpoofer;
             AutoStartExecutor = settings.AutoStartExecutor;
+            ForceRedownloadMods = settings.ForceRedownloadMods;
             AllowMulticlient = settings.AllowMulticlient;
             CustomLaunchDuration = settings.CustomLaunchDuration;
             CustomLoadingIcon = settings.CustomLoadingIcon ?? string.Empty;
@@ -152,6 +156,7 @@ namespace PolyLauncher.ViewModels
             {
                 settings.EnableHwidSpoofer = EnableHwidSpoofer;
                 settings.AutoStartExecutor = AutoStartExecutor;
+                settings.ForceRedownloadMods = ForceRedownloadMods;
                 settings.AllowMulticlient = AllowMulticlient;
                 settings.CustomLaunchDuration = Math.Max(1, Math.Min(60, CustomLaunchDuration));
                 settings.CustomLoadingIcon = string.IsNullOrWhiteSpace(CustomLoadingIcon) ? null : CustomLoadingIcon;

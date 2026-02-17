@@ -80,6 +80,9 @@
                     <CheckBox Content="Auto-Start Executor" 
                               IsChecked="{Binding AutoStartExecutor}"
                               Style="{StaticResource ModernCheckBox}"/>
+                    <CheckBox Content="Force Redownload DLLs" 
+                              IsChecked="{Binding ForceRedownloadMods}"
+                              Style="{StaticResource ModernCheckBox}"/>
                     <CheckBox Content="Allow Multi-Client" 
                               IsChecked="{Binding AllowMulticlient}"
                               Style="{StaticResource ModernCheckBox}"/>

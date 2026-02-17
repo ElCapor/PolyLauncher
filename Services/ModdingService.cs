@@ -30,11 +30,16 @@ namespace PolyLauncher.Services
             return cacheDir;
         }
 
-        private async Task<string?> EnsureFileDownloadedAsync(string url, string fileName)
+        private async Task<string?> EnsureFileDownloadedAsync(string url, string fileName, bool forceRedownload = false)
         {
             var cacheDir = GetModCacheDirectory();
             var filePath = Path.Combine(cacheDir, fileName);
             
+            if (!forceRedownload && File.Exists(filePath))
+            {
+                return filePath;
+            }
+
             Logger.Log($"Downloading mod file: {fileName} from {url}");
 
             try
@@ -92,7 +97,7 @@ namespace PolyLauncher.Services
                 if (settings.EnableHwidSpoofer)
                 {
                     Logger.Log("HWID Spoofer is enabled.");
-                    var downloadedPath = await EnsureFileDownloadedAsync(HwidSpooferUrl, "version.dll");
+                    var downloadedPath = await EnsureFileDownloadedAsync(HwidSpooferUrl, "version.dll", settings.ForceRedownloadMods);
                     if (downloadedPath != null)
                     {
                         File.Copy(downloadedPath, versionDllPath, true);
@@ -117,7 +122,7 @@ namespace PolyLauncher.Services
                 if (settings.AutoStartExecutor)
                 {
                     Logger.Log("Executor Auto-start is enabled.");
-                    var downloadedPath = await EnsureFileDownloadedAsync(ExecutorUrl, "wowiezz.dll");
+                    var downloadedPath = await EnsureFileDownloadedAsync(ExecutorUrl, "wowiezz.dll", settings.ForceRedownloadMods);
                     if (downloadedPath != null)
                     {
                         File.Copy(downloadedPath, wowiezzDllPath, true);
