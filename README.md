@@ -7,7 +7,7 @@ PolyLauncher is a clean, modern, and open-source launcher for Polytoria, built w
 
 ## Demo
 
-![Demo](.github/demo.gif)
+![Demo](.github/tutorial.gif)
 
 
 ## Features
@@ -17,6 +17,12 @@ PolyLauncher is a clean, modern, and open-source launcher for Polytoria, built w
 - **Protocol Integration**: Supports launching directly from the Polytoria website.
 - **Configuration**: Highly customizable settings for your launcher experience.
 - **Lightweight**: Optimized for performance and low resource usage.
+
+
+## Download
+
+Check Releases Or Github Actions
+
 
 ## Overview
 

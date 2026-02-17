@@ -204,9 +204,10 @@ namespace PolyLauncher.Services
                 string shortcutPathEsc = shortcutPath.Replace("'", "''");
                 string targetExePathEsc = targetExePath.Replace("'", "''");
                 string workingDirEsc = (Path.GetDirectoryName(targetExePath) ?? "").Replace("'", "''");
+                string iconPathEsc = Path.Combine(workingDirEsc, "polylauncher.png");
 
                 // PowerShell to create shortcut
-                string command = $"$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{shortcutPathEsc}'); $s.TargetPath = '{targetExePathEsc}'; $s.WorkingDirectory = '{workingDirEsc}'; $s.Save();";
+                string command = $"$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{shortcutPathEsc}'); $s.TargetPath = '{targetExePathEsc}'; $s.WorkingDirectory = '{workingDirEsc}'; $s.IconLocation = '{iconPathEsc}'; $s.Save();";
                 
                 Process.Start(new ProcessStartInfo
                 {

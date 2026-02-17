@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="PolyLauncher - Configuration" 
+        Icon="../polylauncher.png"
         Height="600" 
         Width="500"
         WindowStartupLocation="CenterScreen"
