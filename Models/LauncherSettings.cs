@@ -37,6 +37,9 @@ namespace PolyLauncher.Models
         [JsonProperty("clientManifest")]
         public List<VersionManifest> ClientManifest { get; set; } = new();
 
+        [JsonProperty("creatorManifest")]
+        public List<VersionManifest> CreatorManifest { get; set; } = new();
+
         [JsonProperty("skipUpdates")]
         public bool SkipUpdates { get; set; } = false;
 

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -142,64 +143,26 @@ namespace PolyLauncher.ViewModels
                 }
 
                 _cancellationTokenSource = new CancellationTokenSource();
-                var settings = _settingsService.LoadSettings();
-
-                StatusMessage = "Checking for updates...";
-                ProgressValue = 0;
-
-                var updateInfo = await _updateService.CheckForUpdatesAsync(_launchArguments.Release, _launchArguments.Token);
                 
-                if (updateInfo == null)
+                var progress = new Progress<int>(value =>
                 {
-                    ShowError("Failed to check for updates");
-                    return;
-                }
+                    ProgressValue = value;
+                });
 
-                if (updateInfo.Maintenance)
+                var status = new Progress<string>(message =>
                 {
-                    Services.Logger.Log("Polytoria is under maintenance. Stopping launch.", "WARNING");
-                    ShowError("Polytoria is currently under maintenance");
-                    return;
-                }
+                    StatusMessage = message;
+                });
 
-                var installedVersion = _updateService.GetInstalledClientVersion(_launchArguments.Release);
-                var latestVersion = updateInfo.Client?.Version;
+                var (success, error, version) = await _updateService.CheckUpdateAndPrepareAsync(
+                    _launchArguments, 
+                    progress, 
+                    status, 
+                    _cancellationTokenSource.Token);
 
-                if ((_launchArguments.IsClient || _launchArguments.IsTest) && 
-                    !string.IsNullOrEmpty(latestVersion) &&
-                    !string.IsNullOrEmpty(updateInfo.Client?.Download) &&
-                    (installedVersion == null || installedVersion != latestVersion) &&
-                    !settings.SkipUpdates)
+                if (!success || string.IsNullOrEmpty(version))
                 {
-                    StatusMessage = "Downloading client update...";
-                    
-                    var progress = new Progress<int>(value =>
-                    {
-                        ProgressValue = value;
-                        StatusMessage = $"Downloading client update... {value}%";
-                    });
-
-                    var success = await _updateService.DownloadAndExtractClientAsync(
-                        updateInfo.Client.Download,
-                        latestVersion,
-                        _launchArguments.Release,
-                        installedVersion,  // oldVersion parameter
-                        progress,
-                        _cancellationTokenSource.Token);
-
-                    if (!success)
-                    {
-                        ShowError("Failed to download client update");
-                        return;
-                    }
-
-                    installedVersion = latestVersion;
-                }
-
-                if (string.IsNullOrEmpty(installedVersion))
-                {
-                    Services.Logger.LogError("No client version installed.");
-                    ShowError("Client is not installed");
+                    ShowError(error ?? "Update failed");
                     return;
                 }
 
@@ -208,21 +171,34 @@ namespace PolyLauncher.ViewModels
 
                 await Task.Delay(1000);
 
-                // Prepare mod files (HWID Spoofer, Executor)
-                Services.Logger.Log("Preparing mods before launch...");
-                await _moddingService.PrepareModsAsync(installedVersion);
+                Process? gameProcess;
 
-                var gameProcess = _updateService.LaunchClient(installedVersion, _launchArguments);
-                
-                if (gameProcess != null)
+                if (_launchArguments.IsCreator)
                 {
-                    Services.Logger.Log("Game launched. Monitoring process...");
-                    _ = _moddingService.MonitorGameProcessAsync(installedVersion, gameProcess, _cancellationTokenSource.Token);
+                    Services.Logger.Log("Launching Creator...");
+                    gameProcess = _updateService.LaunchCreator(version, _launchArguments);
                 }
                 else
                 {
-                    Services.Logger.LogError("Failed to launch game process.");
-                    ShowError("Could not start Polytoria Client.");
+                    // Prepare mod files (HWID Spoofer, Executor) - only for Client
+                    Services.Logger.Log("Preparing mods before launch...");
+                    await _moddingService.PrepareModsAsync(version);
+
+                    gameProcess = _updateService.LaunchClient(version, _launchArguments);
+                }
+                
+                if (gameProcess != null)
+                {
+                    Services.Logger.Log("Application launched. Monitoring process...");
+                    if (!_launchArguments.IsCreator)
+                    {
+                        _ = _moddingService.MonitorGameProcessAsync(version, gameProcess, _cancellationTokenSource.Token);
+                      }
+                }
+                else
+                {
+                    Services.Logger.LogError("Failed to launch application process.");
+                    ShowError($"Could not start Polytoria {(_launchArguments.IsCreator ? "Creator" : "Client")}.");
                     return;
                 }
 

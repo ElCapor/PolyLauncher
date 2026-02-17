@@ -18,38 +18,41 @@ namespace PolyLauncher.Services
         }
 
         /// <summary>
-        /// Gets the official Polytoria client directory (%AppData%/Polytoria/Client)
+        /// Gets the official Polytoria directory (Client or Creator)
         /// </summary>
-        public string GetPolytoriaClientDirectory()
+        public string GetPolytoriaDirectory(string type)
         {
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            return Path.Combine(appData, "Polytoria", "Client");
+            return Path.Combine(appData, "Polytoria", type);
         }
 
+        public string GetPolytoriaClientDirectory() => GetPolytoriaDirectory("Client");
+        public string GetPolytoriaCreatorDirectory() => GetPolytoriaDirectory("Creator");
+
         /// <summary>
-        /// Detects the currently installed client version by reading folder names in the Client directory.
-        /// Returns the version string (e.g., "1.4.155") or null if not installed.
+        /// Detects the currently installed version for a given type and release.
         /// </summary>
-        public string? GetInstalledClientVersion(string release)
+        public string? GetInstalledVersion(string type, string release)
         {
             // First check our manifest
             var settings = _settingsService.LoadSettings();
-            var manifestVersion = settings.ClientManifest
+            var manifest = type.ToLower() == "creator" ? settings.CreatorManifest : settings.ClientManifest;
+            var manifestVersion = manifest
                 .FirstOrDefault(v => v.Release == release)?.Version;
 
             if (!string.IsNullOrEmpty(manifestVersion))
             {
-                var versionPath = Path.Combine(GetPolytoriaClientDirectory(), manifestVersion);
+                var versionPath = Path.Combine(GetPolytoriaDirectory(type), manifestVersion);
                 if (Directory.Exists(versionPath))
                     return manifestVersion;
             }
 
-            // Fallback: scan the Client directory for version folders
-            var clientDir = GetPolytoriaClientDirectory();
-            if (!Directory.Exists(clientDir))
+            // Fallback: scan the directory for version folders
+            var baseDir = GetPolytoriaDirectory(type);
+            if (!Directory.Exists(baseDir))
                 return null;
 
-            var versionDirs = Directory.GetDirectories(clientDir)
+            var versionDirs = Directory.GetDirectories(baseDir)
                 .Select(Path.GetFileName)
                 .Where(name => !string.IsNullOrEmpty(name) && IsVersionString(name!))
                 .OrderByDescending(v => v)
@@ -57,6 +60,9 @@ namespace PolyLauncher.Services
 
             return versionDirs;
         }
+
+        public string? GetInstalledClientVersion(string release) => GetInstalledVersion("Client", release);
+        public string? GetInstalledCreatorVersion(string release) => GetInstalledVersion("Creator", release);
 
         /// <summary>
         /// Checks if a string looks like a version number (e.g., "1.4.155")
@@ -110,12 +116,13 @@ namespace PolyLauncher.Services
         /// <summary>
         /// Checks if an update is needed by comparing installed version with API version
         /// </summary>
-        public async Task<(bool NeedsUpdate, string? NewVersion, string? DownloadUrl)> CheckClientUpdateNeededAsync(
+        public async Task<(bool NeedsUpdate, string? NewVersion, string? DownloadUrl)> CheckUpdateNeededAsync(
+            string type,
             string release, 
             string? token = null)
         {
-            var installedVersion = GetInstalledClientVersion(release);
-            Logger.Log($"Currently installed version for {release}: {installedVersion ?? "None"}");
+            var installedVersion = GetInstalledVersion(type, release);
+            Logger.Log($"Currently installed version for {type} ({release}): {installedVersion ?? "None"}");
             var updateResponse = await CheckForUpdatesAsync(release, token);
 
             if (updateResponse == null)
@@ -124,30 +131,37 @@ namespace PolyLauncher.Services
             if (updateResponse.Maintenance)
                 return (false, null, null);
 
-            var clientInfo = updateResponse.Client;
-            if (clientInfo == null || string.IsNullOrEmpty(clientInfo.Version) || string.IsNullOrEmpty(clientInfo.Download))
+            var info = type.ToLower() == "creator" ? updateResponse.Creator : updateResponse.Client;
+            if (info == null || string.IsNullOrEmpty(info.Version) || string.IsNullOrEmpty(info.Download))
             {
-                Logger.Log("No client update information found in API response.");
+                Logger.Log($"No {type} update information found in API response.");
                 return (false, null, null);
             }
 
-            Logger.Log($"Latest version available: {clientInfo.Version}");
+            Logger.Log($"Latest version available: {info.Version}");
 
             // If no version installed, or version differs, need update
-            if (string.IsNullOrEmpty(installedVersion) || installedVersion != clientInfo.Version)
+            if (string.IsNullOrEmpty(installedVersion) || installedVersion != info.Version)
             {
-                Logger.Log($"Update needed: {installedVersion ?? "None"} -> {clientInfo.Version}");
-                return (true, clientInfo.Version, clientInfo.Download);
+                Logger.Log($"Update needed: {installedVersion ?? "None"} -> {info.Version}");
+                return (true, info.Version, info.Download);
             }
 
-            Logger.Log("Client is up to date.");
+            Logger.Log($"{type} is up to date.");
             return (false, installedVersion, null);
         }
 
+        public async Task<(bool NeedsUpdate, string? NewVersion, string? DownloadUrl)> CheckClientUpdateNeededAsync(string release, string? token = null)
+            => await CheckUpdateNeededAsync("Client", release, token);
+
+        public async Task<(bool NeedsUpdate, string? NewVersion, string? DownloadUrl)> CheckCreatorUpdateNeededAsync(string release, string? token = null)
+            => await CheckUpdateNeededAsync("Creator", release, token);
+
         /// <summary>
-        /// Downloads and extracts the client update
+        /// Downloads and extracts the update for a given type
         /// </summary>
-        public async Task<bool> DownloadAndExtractClientAsync(
+        public async Task<bool> DownloadAndExtractAsync(
+            string type,
             string downloadUrl, 
             string version, 
             string release,
@@ -155,28 +169,30 @@ namespace PolyLauncher.Services
             IProgress<int>? progress = null,
             CancellationToken cancellationToken = default)
         {
-            Logger.Log($"Downloading client update: {version} ({release})");
+            Logger.Log($"Downloading {type} update: {version} ({release})");
             try
             {
-                var clientDir = GetPolytoriaClientDirectory();
-                Directory.CreateDirectory(clientDir);
+                var baseDir = GetPolytoriaDirectory(type);
+                Directory.CreateDirectory(baseDir);
 
                 // Remove old version directory if exists and different from new version
                 if (!string.IsNullOrEmpty(oldVersion) && oldVersion != version)
                 {
-                    var oldVersionDir = Path.Combine(clientDir, oldVersion);
+                    var oldVersionDir = Path.Combine(baseDir, oldVersion);
                     if (Directory.Exists(oldVersionDir))
                     {
                         Logger.Log($"Removing old version directory: {oldVersionDir}");
-                        Directory.Delete(oldVersionDir, true);
+                        try { Directory.Delete(oldVersionDir, true); } catch { }
                     }
                 }
 
-                var versionDir = Path.Combine(clientDir, version);
+                var versionDir = Path.Combine(baseDir, version);
                 
                 // Remove existing version directory if it exists
                 if (Directory.Exists(versionDir))
-                    Directory.Delete(versionDir, true);
+                {
+                    try { Directory.Delete(versionDir, true); } catch { }
+                }
                 
                 Directory.CreateDirectory(versionDir);
 
@@ -184,7 +200,7 @@ namespace PolyLauncher.Services
                 Directory.CreateDirectory(tempDir);
                 
                 var archiveExtension = new Uri(downloadUrl).AbsolutePath.EndsWith(".7z") ? ".7z" : ".zip";
-                var archivePath = Path.Combine(tempDir, $"Client{archiveExtension}");
+                var archivePath = Path.Combine(tempDir, $"{type}{archiveExtension}");
 
                 // Remove existing archive if it exists
                 if (File.Exists(archivePath))
@@ -243,8 +259,9 @@ namespace PolyLauncher.Services
                 Logger.Log("Updating settings manifest.");
                 _settingsService.UpdateSettings(settings =>
                 {
-                    settings.ClientManifest.RemoveAll(v => v.Release == release);
-                    settings.ClientManifest.Add(new Models.VersionManifest
+                    var manifest = type.ToLower() == "creator" ? settings.CreatorManifest : settings.ClientManifest;
+                    manifest.RemoveAll(v => v.Release == release);
+                    manifest.Add(new Models.VersionManifest
                     {
                         Release = release,
                         Version = version,
@@ -256,52 +273,76 @@ namespace PolyLauncher.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError("Failed to download or extract client update", ex);
+                Logger.LogError($"Failed to download or extract {type} update", ex);
                 return false;
             }
         }
 
+        public async Task<bool> DownloadAndExtractClientAsync(
+            string downloadUrl, 
+            string version, 
+            string release,
+            string? oldVersion = null,
+            IProgress<int>? progress = null,
+            CancellationToken cancellationToken = default)
+            => await DownloadAndExtractAsync("Client", downloadUrl, version, release, oldVersion, progress, cancellationToken);
+
+        public async Task<bool> DownloadAndExtractCreatorAsync(
+            string downloadUrl, 
+            string version, 
+            string release,
+            string? oldVersion = null,
+            IProgress<int>? progress = null,
+            CancellationToken cancellationToken = default)
+            => await DownloadAndExtractAsync("Creator", downloadUrl, version, release, oldVersion, progress, cancellationToken);
+
         /// <summary>
-        /// Gets the path to the client executable for a specific version
+        /// Gets the path to the executable for a specific type and version
         /// </summary>
-        public string? GetClientExecutablePath(string version)
+        public string? GetExecutablePath(string type, string version)
         {
-            var clientDir = GetPolytoriaClientDirectory();
-            var versionDir = Path.Combine(clientDir, version);
-            var exePath = Path.Combine(versionDir, "Polytoria Client.exe");
+            var baseDir = GetPolytoriaDirectory(type);
+            var versionDir = Path.Combine(baseDir, version);
+            var exeName = type.ToLower() == "creator" ? "Polytoria Creator.exe" : "Polytoria Client.exe";
+            var exePath = Path.Combine(versionDir, exeName);
             
             bool exists = File.Exists(exePath);
-            if (!exists) Logger.Log($"Client executable not found at: {exePath}", "WARNING");
+            if (!exists) Logger.Log($"{type} executable not found at: {exePath}", "WARNING");
             
             return exists ? exePath : null;
         }
 
+        public string? GetClientExecutablePath(string version) => GetExecutablePath("Client", version);
+        public string? GetCreatorExecutablePath(string version) => GetExecutablePath("Creator", version);
+
         /// <summary>
-        /// Launches the Polytoria client with the specified arguments
+        /// Launches the Polytoria application (Client or Creator)
         /// </summary>
-        public Process? LaunchClient(string version, Models.LaunchArguments args)
+        public Process? Launch(string type, string version, Models.LaunchArguments args)
         {
-            Logger.Log($"Attempting to launch client version {version}");
-            var exePath = GetClientExecutablePath(version);
+            Logger.Log($"Attempting to launch {type} version {version}");
+            var exePath = GetExecutablePath(type, version);
             if (exePath == null)
             {
-                Logger.LogError("Cannot launch client: Executable not found.");
+                Logger.LogError($"Cannot launch {type}: Executable not found.");
                 return null;
             }
 
             var settings = _settingsService.LoadSettings();
 
-            // Kill any existing client process first if multi-client is disabled
-            if (!settings.AllowMulticlient)
+            // Kill any existing process first if multi-client is disabled (for Client)
+            // Creator might not need this but let's keep it consistent if desired
+            var procName = type.ToLower() == "creator" ? "Polytoria Creator" : "Polytoria Client";
+            if (!settings.AllowMulticlient || type.ToLower() == "creator")
             {
                 try
                 {
-                    var existingProcesses = Process.GetProcessesByName("Polytoria Client");
+                    var existingProcesses = Process.GetProcessesByName(procName);
                     foreach (var proc in existingProcesses)
                     {
                         try 
                         { 
-                            Logger.Log($"Killing existing client process (PID: {proc.Id}) because AllowMulticlient is false");
+                            Logger.Log($"Killing existing {type} process (PID: {proc.Id})");
                             proc.Kill(); 
                             proc.WaitForExit(1000); 
                         } catch { }
@@ -309,14 +350,14 @@ namespace PolyLauncher.Services
                 }
                 catch { }
             }
-            else
-            {
-                Logger.Log("Skipping process cleanup because AllowMulticlient is true");
-            }
 
             // Build arguments based on launch type
             string arguments;
-            if (args.IsTest)
+            if (type.ToLower() == "creator")
+            {
+                arguments = $"-asset {args.Map} -token {args.Token}";
+            }
+            else if (args.IsTest)
             {
                 arguments = $"-solo {args.Map}";
             }
@@ -338,7 +379,7 @@ namespace PolyLauncher.Services
             var procStart = Process.Start(startInfo);
             if (procStart != null)
             {
-                Logger.Log($"Client launched successfully. PID: {procStart.Id}");
+                Logger.Log($"{type} launched successfully. PID: {procStart.Id}");
             }
             else
             {
@@ -347,6 +388,9 @@ namespace PolyLauncher.Services
 
             return procStart;
         }
+
+        public Process? LaunchClient(string version, Models.LaunchArguments args) => Launch("Client", version, args);
+        public Process? LaunchCreator(string version, Models.LaunchArguments args) => Launch("Creator", version, args);
 
         /// <summary>
         /// Performs the full update check and launch flow
@@ -362,15 +406,17 @@ namespace PolyLauncher.Services
 
             status?.Report("Checking for updates...");
 
-            var (needsUpdate, newVersion, downloadUrl) = await CheckClientUpdateNeededAsync(release, token);
+            var type = args.IsCreator ? "Creator" : "Client";
+            var (needsUpdate, newVersion, downloadUrl) = await CheckUpdateNeededAsync(type, release, token);
 
             if (needsUpdate && !string.IsNullOrEmpty(downloadUrl) && !string.IsNullOrEmpty(newVersion))
             {
-                var oldVersion = GetInstalledClientVersion(release);
+                var oldVersion = GetInstalledVersion(type, release);
                 
-                status?.Report($"Downloading client update ({newVersion})...");
+                status?.Report($"Downloading {type} update ({newVersion})...");
                 
-                var success = await DownloadAndExtractClientAsync(
+                var success = await DownloadAndExtractAsync(
+                    type,
                     downloadUrl, 
                     newVersion, 
                     release,
@@ -379,18 +425,18 @@ namespace PolyLauncher.Services
                     cancellationToken);
 
                 if (!success)
-                    return (false, "Failed to download and extract client update", null);
+                    return (false, $"Failed to download and extract {type} update", null);
 
                 return (true, null, newVersion);
             }
 
-            var installedVersion = GetInstalledClientVersion(release);
+            var installedVersion = GetInstalledVersion(type, release);
             if (string.IsNullOrEmpty(installedVersion))
-                return (false, "No client version installed and no update available", null);
+                return (false, $"No {type} version installed and no update available", null);
 
-            var exePath = GetClientExecutablePath(installedVersion);
+            var exePath = GetExecutablePath(type, installedVersion);
             if (exePath == null)
-                return (false, "Client executable not found", null);
+                return (false, $"{type} executable not found", null);
 
             return (true, null, installedVersion);
         }
