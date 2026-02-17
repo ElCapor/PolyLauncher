@@ -132,6 +132,22 @@ namespace PolyLauncher.ViewModels
         [RelayCommand]
         private void SaveSettings()
         {
+            ApplySettings();
+            MessageBox.Show("Settings saved successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        [RelayCommand]
+        private void SaveAndRestart()
+        {
+            ApplySettings();
+            if (Application.Current is App app)
+            {
+                app.Restart();
+            }
+        }
+
+        private void ApplySettings()
+        {
             _settingsService.UpdateSettings(settings =>
             {
                 settings.EnableHwidSpoofer = EnableHwidSpoofer;
@@ -146,8 +162,6 @@ namespace PolyLauncher.ViewModels
                 settings.InstallPath = InstallPath;
                 settings.FirstRun = false;
             });
-
-            MessageBox.Show("Settings saved successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         [RelayCommand]

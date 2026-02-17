@@ -8,12 +8,17 @@ namespace PolyLauncher.Services
         private readonly string _settingsPath;
         private Models.LauncherSettings? _settings;
 
+        public static event EventHandler? SettingsChanged;
+
         public SettingsService()
         {
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var launcherDir = Path.Combine(appData, "PolyLauncher");
             Directory.CreateDirectory(launcherDir);
             _settingsPath = Path.Combine(launcherDir, "Settings.json");
+            
+            // Listen for changes from other instances to clear local cache
+            SettingsChanged += (s, e) => _settings = null;
         }
 
         public Models.LauncherSettings LoadSettings()
@@ -48,6 +53,7 @@ namespace PolyLauncher.Services
 
             var json = JsonConvert.SerializeObject(_settings, Formatting.Indented);
             File.WriteAllText(_settingsPath, json);
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void UpdateSettings(Action<Models.LauncherSettings> updateAction)

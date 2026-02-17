@@ -1,5 +1,7 @@
 ﻿using System.Windows;
 using System.IO;
+using System.Diagnostics;
+using System.Linq;
 
 namespace PolyLauncher
 {
@@ -8,8 +10,13 @@ namespace PolyLauncher
     /// </summary>
     public partial class App : Application
     {
+        private string[] _args = Array.Empty<string>();
+
         protected override void OnStartup(StartupEventArgs e)
         {
+            if (e.Args != null)
+                _args = e.Args;
+                
             // Initialize logging first
             Services.Logger.Initialize();
             Console.SetOut(new Services.LogWriter());
@@ -137,6 +144,24 @@ namespace PolyLauncher
             mainWindow.Show();
 
             _ = viewModel.InitializeAsync(launchArgs);
+        }
+
+        public void Restart()
+        {
+            try
+            {
+                var exePath = Process.GetCurrentProcess().MainModule?.FileName;
+                if (exePath != null)
+                {
+                    var argsString = string.Join(" ", _args.Select(a => $"\"{a}\""));
+                    Process.Start(exePath, argsString);
+                    Shutdown();
+                }
+            }
+            catch (Exception ex)
+            {
+                Services.Logger.LogError("Failed to restart launcher", ex);
+            }
         }
     }
 

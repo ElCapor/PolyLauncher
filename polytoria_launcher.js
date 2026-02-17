@@ -1,3 +1,8 @@
+/*
+
+Unobsfucated Polytoria Launcher using https://github.com/ElCapor/synchrony-rs
+
+*/
 "use strict";
 const W = I;
 const { app: c, shell: d, BrowserWindow: o, ipcMain: t } = {

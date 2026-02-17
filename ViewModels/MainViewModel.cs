@@ -55,6 +55,22 @@ namespace PolyLauncher.ViewModels
                 Interval = TimeSpan.FromSeconds(1)
             };
             _countdownTimer.Tick += CountdownTimer_Tick;
+
+            // Subscribe to settings changes to reload configuration immediately
+            Services.SettingsService.SettingsChanged += (s, e) => 
+            {
+                Application.Current.Dispatcher.Invoke(() => RefreshVisualSettings());
+            };
+        }
+
+        private void RefreshVisualSettings()
+        {
+            var settings = _settingsService.LoadSettings();
+            LoadingText = settings.LoadingText;
+            try { BackgroundBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(settings.BackgroundColor)); } catch { }
+            try { LoadingBarBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(settings.LoadingBarColor)); } catch { }
+            try { TextBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(settings.TextColor)); } catch { }
+            CustomIconPath = settings.CustomLoadingIcon;
         }
 
         public async Task InitializeAsync(Models.LaunchArguments? launchArgs)
@@ -246,12 +262,7 @@ namespace PolyLauncher.ViewModels
                 return;
             }
 
-            // Refresh visual settings
-            LoadingText = settings.LoadingText;
-            try { BackgroundBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(settings.BackgroundColor)); } catch { }
-            try { LoadingBarBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(settings.LoadingBarColor)); } catch { }
-            try { TextBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(settings.TextColor)); } catch { }
-            CustomIconPath = settings.CustomLoadingIcon;
+            RefreshVisualSettings();
 
             ShowConfiguration = false;
             ShowLoading = true;

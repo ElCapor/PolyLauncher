@@ -232,6 +232,11 @@
                         Command="{Binding SaveSettingsCommand}"
                         Style="{StaticResource ModernButton}"
                         Margin="5"/>
+                <Button Content="Save &amp; Restart" 
+                        Command="{Binding SaveAndRestartCommand}"
+                        Style="{StaticResource ModernButton}"
+                        Background="#007ACC"
+                        Margin="5"/>
                 <Button Content="Reset to Defaults" 
                         Command="{Binding ResetToDefaultsCommand}"
                         Style="{StaticResource ModernButton}"
