@@ -21,7 +21,14 @@ PolyLauncher is a clean, modern, and open-source launcher for Polytoria, built w
 
 ## Download
 
-Check Releases Or Github Actions
+<div align="center">
+    <a href="https://github.com/ElCapor/PolyLauncher/releases/tag/v1">
+        <img src=".github/polyhack_download.png">
+    </a>
+</div>
+
+
+### Or from Github Actions : https://github.com/ElCapor/PolyLauncher/actions
 
 
 ## Overview
