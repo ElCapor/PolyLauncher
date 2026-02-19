@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using Newtonsoft.Json;
+using SharpCompress.Archives;
+using SharpCompress.Common;
 
 namespace PolyLauncher.Services
 {
@@ -43,7 +45,7 @@ namespace PolyLauncher.Services
             if (!string.IsNullOrEmpty(manifestVersion))
             {
                 var versionPath = Path.Combine(GetPolytoriaDirectory(type), manifestVersion);
-                if (Directory.Exists(versionPath))
+                if (Directory.Exists(versionPath) && Directory.EnumerateFileSystemEntries(versionPath).Any())
                     return manifestVersion;
             }
 
@@ -55,6 +57,7 @@ namespace PolyLauncher.Services
             var versionDirs = Directory.GetDirectories(baseDir)
                 .Select(Path.GetFileName)
                 .Where(name => !string.IsNullOrEmpty(name) && IsVersionString(name!))
+                .Where(name => Directory.EnumerateFileSystemEntries(Path.Combine(baseDir, name!)).Any())
                 .OrderByDescending(v => v)
                 .FirstOrDefault();
 
@@ -240,9 +243,17 @@ namespace PolyLauncher.Services
                 Logger.Log($"Extracting archive to: {versionDir}");
                 if (archiveExtension == ".7z")
                 {
-                    // Use 7zip for .7z files - would need SevenZipExtractor or similar
-                    // For now, throw an exception indicating 7z support needed
-                    throw new NotSupportedException("7z extraction requires additional library. Please install SharpCompress or use the official launcher.");
+                    using (var archive = ArchiveFactory.Open(archivePath))
+                    {
+                        foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+                        {
+                            entry.WriteToDirectory(versionDir, new ExtractionOptions
+                            {
+                                ExtractFullPath = true,
+                                Overwrite = true
+                            });
+                        }
+                    }
                 }
                 else
                 {
@@ -355,11 +366,11 @@ namespace PolyLauncher.Services
             string arguments;
             if (type.ToLower() == "creator")
             {
-                arguments = $"-asset {args.Map} -token {args.Token}";
+                arguments = $"-asset \"{args.Map}\" -token {args.Token}";
             }
             else if (args.IsTest)
             {
-                arguments = $"-solo {args.Map}";
+                arguments = $"-solo \"{args.Map}\"";
             }
             else
             {
