@@ -45,14 +45,23 @@ namespace PolyLauncher.Services
             if (!string.IsNullOrEmpty(manifestVersion))
             {
                 var versionPath = Path.Combine(GetPolytoriaDirectory(type), manifestVersion);
+                Logger.Log($"Checking manifest version: {manifestVersion} at {versionPath}");
                 if (Directory.Exists(versionPath) && Directory.EnumerateFileSystemEntries(versionPath).Any())
+                {
+                    Logger.Log($"Manifest version found and is valid: {manifestVersion}");
                     return manifestVersion;
+                }
+                Logger.Log($"Manifest version directory not found or empty: {versionPath}");
             }
 
             // Fallback: scan the directory for version folders
             var baseDir = GetPolytoriaDirectory(type);
+            Logger.Log($"Scanning base directory for version folders: {baseDir}");
             if (!Directory.Exists(baseDir))
+            {
+                Logger.Log($"Base directory does not exist: {baseDir}");
                 return null;
+            }
 
             var versionDirs = Directory.GetDirectories(baseDir)
                 .Select(Path.GetFileName)
@@ -81,7 +90,9 @@ namespace PolyLauncher.Services
         public string GetUserAgent()
         {
             var version = GetInstalledClientVersion("Stable") ?? GetInstalledClientVersion("Beta") ?? "1.4.155";
-            return $"PolytoriaLauncher/{version}";
+            var userAgent = $"PolytoriaLauncher/{version}";
+            Logger.Log($"User-Agent string: {userAgent}");
+            return userAgent;
         }
 
         /// <summary>
@@ -125,14 +136,20 @@ namespace PolyLauncher.Services
             string? token = null)
         {
             var installedVersion = GetInstalledVersion(type, release);
-            Logger.Log($"Currently installed version for {type} ({release}): {installedVersion ?? "None"}");
+            Logger.Log($"CheckUpdateNeeded: {type} ({release}). Installed version: {installedVersion ?? "None"}");
             var updateResponse = await CheckForUpdatesAsync(release, token);
 
             if (updateResponse == null)
+            {
+                Logger.LogError($"Failed to get update response for {type} ({release}).");
                 return (false, null, null);
+            }
 
             if (updateResponse.Maintenance)
+            {
+                Logger.Log("Polytoria is currently in maintenance. Update cannot proceed.");
                 return (false, null, null);
+            }
 
             var info = type.ToLower() == "creator" ? updateResponse.Creator : updateResponse.Client;
             if (info == null || string.IsNullOrEmpty(info.Version) || string.IsNullOrEmpty(info.Download))
@@ -141,16 +158,16 @@ namespace PolyLauncher.Services
                 return (false, null, null);
             }
 
-            Logger.Log($"Latest version available: {info.Version}");
+            Logger.Log($"Latest {type} version available: {info.Version}");
 
             // If no version installed, or version differs, need update
             if (string.IsNullOrEmpty(installedVersion) || installedVersion != info.Version)
             {
-                Logger.Log($"Update needed: {installedVersion ?? "None"} -> {info.Version}");
+                Logger.Log($"{type} update needed: {installedVersion ?? "None"} -> {info.Version}");
                 return (true, info.Version, info.Download);
             }
 
-            Logger.Log($"{type} is up to date.");
+            Logger.Log($"{type} version {installedVersion} is up to date.");
             return (false, installedVersion, null);
         }
 
@@ -331,11 +348,11 @@ namespace PolyLauncher.Services
         /// </summary>
         public Process? Launch(string type, string version, Models.LaunchArguments args)
         {
-            Logger.Log($"Attempting to launch {type} version {version}");
+            Logger.Log($"Attempting to launch {type}. Version: {version}. Type: {args.Type}. Release: {args.Release}");
             var exePath = GetExecutablePath(type, version);
             if (exePath == null)
             {
-                Logger.LogError($"Cannot launch {type}: Executable not found.");
+                Logger.LogError($"Cannot launch {type}: Executable not found for version {version}. Type: {type}. Release: {args.Release}");
                 return null;
             }
 
@@ -387,17 +404,26 @@ namespace PolyLauncher.Services
                 WorkingDirectory = Path.GetDirectoryName(exePath)
             };
 
-            var procStart = Process.Start(startInfo);
-            if (procStart != null)
+            Logger.Log($"Starting process: {exePath} with arguments: {arguments}");
+            try 
             {
-                Logger.Log($"{type} launched successfully. PID: {procStart.Id}");
-            }
-            else
+                var procStart = Process.Start(startInfo);
+                if (procStart != null)
+                {
+                    Logger.Log($"{type} launched successfully. PID: {procStart.Id}");
+                    return procStart;
+                }
+                else
+                {
+                    Logger.LogError($"Process.Start returned null for {exePath}");
+                    return null;
+                }
+            } 
+            catch (Exception ex)
             {
-                Logger.LogError("Process.Start returned null.");
+                Logger.LogError($"Failed to start process: {exePath}", ex);
+                return null;
             }
-
-            return procStart;
         }
 
         public Process? LaunchClient(string version, Models.LaunchArguments args) => Launch("Client", version, args);

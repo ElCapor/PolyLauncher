@@ -36,13 +36,22 @@ namespace PolyLauncher
 
             base.OnStartup(e);
 
-            Services.Logger.Log("PolyLauncher starting up...");
+            Services.Logger.Log($"PolyLauncher starting up... Command line arguments: {string.Join(" ", e.Args)}");
 
             var settingsService = new Services.SettingsService();
             var installService = new Services.InstallationService(settingsService);
 
             var launchArgs = Services.ProtocolService.ParseProtocolArguments(e.Args);
             
+            if (launchArgs != null)
+            {
+                 Services.Logger.Log($"Parsed protocol arguments: Type={launchArgs.Type}, Token={launchArgs.Token}, Map={launchArgs.Map}");
+            }
+            else
+            {
+                 Services.Logger.Log("No protocol arguments parsed or invalid format.");
+            }
+
             if (e.Args.Length > 0 && e.Args[0] == "--configure")
             {
                 var configWindow = new Views.ConfigurationWindow();

@@ -88,7 +88,10 @@ namespace PolyLauncher.Services
             var clientVersionDir = Path.Combine(appData, "Polytoria", "Client", version);
 
             if (!Directory.Exists(clientVersionDir))
-                return;
+            {
+                 Logger.Log($"Client version directory not found for mod preparation: {clientVersionDir}", "WARNING");
+                 return;
+            }
 
             // HWID Spoofer (version.dll)
             var versionDllPath = Path.Combine(clientVersionDir, "version.dll");
@@ -101,13 +104,13 @@ namespace PolyLauncher.Services
                     if (downloadedPath != null)
                     {
                         File.Copy(downloadedPath, versionDllPath, true);
-                        Logger.Log("HWID Spoofer (version.dll) applied to client directory.");
+                        Logger.Log($"HWID Spoofer (version.dll) applied to client directory: {versionDllPath}");
                     }
                 }
                 else if (File.Exists(versionDllPath))
                 {
                     File.Delete(versionDllPath);
-                    Logger.Log("HWID Spoofer (version.dll) removed from client directory.");
+                    Logger.Log($"HWID Spoofer (version.dll) removed from client directory: {versionDllPath}");
                 }
             }
             catch (IOException ex)
@@ -126,19 +129,20 @@ namespace PolyLauncher.Services
                     if (downloadedPath != null)
                     {
                         File.Copy(downloadedPath, wowiezzDllPath, true);
-                        Logger.Log("Executor (wowiezz.dll) applied to client directory.");
+                        Logger.Log($"Executor (wowiezz.dll) applied to client directory: {wowiezzDllPath}");
                     }
                 }
                 else if (File.Exists(wowiezzDllPath))
                 {
                     File.Delete(wowiezzDllPath);
-                    Logger.Log("Executor (wowiezz.dll) removed from client directory.");
+                    Logger.Log($"Executor (wowiezz.dll) removed from client directory: {wowiezzDllPath}");
                 }
             }
             catch (IOException ex)
             {
                 Logger.Log($"Could not update wowiezz.dll: {ex.Message}. Skipping.");
             }
+            Logger.Log("Mod preparation complete.");
         }
 
         /// <summary>

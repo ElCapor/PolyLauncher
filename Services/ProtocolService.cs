@@ -69,22 +69,32 @@ namespace PolyLauncher.Services
 
         public static Models.LaunchArguments? ParseProtocolArguments(string[] args)
         {
+            Logger.Log($"Parsing protocol arguments. Total args: {args.Length}");
             foreach (var arg in args)
             {
+                Logger.Log($"Processing argument: {arg}");
                 if (arg.StartsWith($"{ProtocolName}://"))
                 {
-                    var parts = arg.Replace($"{ProtocolName}://", "").Split('/');
+                    Logger.Log($"Found protocol match: {arg}");
+                    var parts = arg.Replace($"{ProtocolName}://", "").Split('/', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length >= 2)
                     {
-                        return new Models.LaunchArguments
+                        var launchArgs = new Models.LaunchArguments
                         {
                             Type = parts[0],
                             Token = parts[1],
                             Map = parts.Length > 2 ? string.Join("/", parts.Skip(2)) : string.Empty
                         };
+                        Logger.Log($"Successfully parsed launch arguments: Type={launchArgs.Type}, Token={launchArgs.Token}, Map={launchArgs.Map}");
+                        return launchArgs;
+                    }
+                    else
+                    {
+                         Logger.Log($"Protocol argument has insufficient parts: {arg}", "WARNING");
                     }
                 }
             }
+            Logger.Log("No valid protocol argument found.");
             return null;
         }
     }

@@ -88,13 +88,16 @@ namespace PolyLauncher.ViewModels
 
             if (settings.FirstRun || _launchArguments == null || !_launchArguments.IsValid)
             {
-                Services.Logger.Log("First run or invalid arguments. Showing configuration.");
+                Services.Logger.Log($"First run or invalid arguments. FirstRun: {settings.FirstRun}, " +
+                                  $"LaunchArguments is null: {_launchArguments == null}, " +
+                                  $"LaunchArguments.IsValid: {_launchArguments?.IsValid ?? false}. " +
+                                  "Showing configuration.");
                 ShowConfiguration = true;
                 ShowLoading = false;
                 return;
             }
 
-            Services.Logger.Log($"Launch arguments detected: Type={_launchArguments.Type}, Release={_launchArguments.Release}");
+            Services.Logger.Log($"Launch arguments detected: Type={_launchArguments.Type}, Release={_launchArguments.Release}, Map={_launchArguments.Map}");
             ShowConfiguration = false;
             ShowLoading = true;
 
@@ -162,6 +165,7 @@ namespace PolyLauncher.ViewModels
 
                 if (!success || string.IsNullOrEmpty(version))
                 {
+                    Services.Logger.LogError($"Update check and prepare failed: {error ?? "Unknown error"}. Version: {version ?? "None"}");
                     ShowError(error ?? "Update failed");
                     return;
                 }
@@ -175,25 +179,26 @@ namespace PolyLauncher.ViewModels
 
                 if (_launchArguments.IsCreator)
                 {
-                    Services.Logger.Log("Launching Creator...");
+                    Services.Logger.Log($"Launching Creator Version {version}...");
                     gameProcess = _updateService.LaunchCreator(version, _launchArguments);
                 }
                 else
                 {
                     // Prepare mod files (HWID Spoofer, Executor) - only for Client
-                    Services.Logger.Log("Preparing mods before launch...");
+                    Services.Logger.Log($"Preparing mods for version {version} before launch...");
                     await _moddingService.PrepareModsAsync(version);
 
+                    Services.Logger.Log($"Launching Client Version {version}...");
                     gameProcess = _updateService.LaunchClient(version, _launchArguments);
                 }
                 
                 if (gameProcess != null)
                 {
-                    Services.Logger.Log("Application launched. Monitoring process...");
+                    Services.Logger.Log($"Application launched successfully. PID: {gameProcess.Id}. Monitoring process...");
                     if (!_launchArguments.IsCreator)
                     {
                         _ = _moddingService.MonitorGameProcessAsync(version, gameProcess, _cancellationTokenSource.Token);
-                      }
+                    }
                 }
                 else
                 {
