@@ -67,7 +67,9 @@ namespace PolyLauncher.Services
                 .Select(Path.GetFileName)
                 .Where(name => !string.IsNullOrEmpty(name) && IsVersionString(name!))
                 .Where(name => Directory.EnumerateFileSystemEntries(Path.Combine(baseDir, name!)).Any())
-                .OrderByDescending(v => v)
+                .Select(v => new { StringVersion = v, ParsedVersion = Version.TryParse(v, out var parsed) ? parsed : new Version(0, 0) })
+                .OrderByDescending(v => v.ParsedVersion)
+                .Select(v => v.StringVersion)
                 .FirstOrDefault();
 
             return versionDirs;
@@ -194,17 +196,6 @@ namespace PolyLauncher.Services
             {
                 var baseDir = GetPolytoriaDirectory(type);
                 Directory.CreateDirectory(baseDir);
-
-                // Remove old version directory if exists and different from new version
-                if (!string.IsNullOrEmpty(oldVersion) && oldVersion != version)
-                {
-                    var oldVersionDir = Path.Combine(baseDir, oldVersion);
-                    if (Directory.Exists(oldVersionDir))
-                    {
-                        Logger.Log($"Removing old version directory: {oldVersionDir}");
-                        try { Directory.Delete(oldVersionDir, true); } catch { }
-                    }
-                }
 
                 var versionDir = Path.Combine(baseDir, version);
                 
